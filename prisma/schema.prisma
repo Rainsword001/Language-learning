@@ -1,0 +1,269 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+enum Role {
+  USER
+  ADMIN
+}
+
+enum LessonStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  MATCHING
+  FILL_BLANK
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+model User {
+  id                String    @id @default(uuid())
+  name              String
+  email             String    @unique
+  passwordHash      String
+  role              Role      @default(USER)
+  emailVerified     Boolean   @default(false)
+  refreshTokenHash  String?
+  resetTokenHash    String?
+  resetTokenExpiry   DateTime?
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  userLanguages     UserLanguage[]
+  lessonProgress    LessonProgress[]
+  quizAttempts      QuizAttempt[]
+  streak            Streak?
+  subscriptions     Subscription[]
+
+  @@map("users")
+}
+
+model Language {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  description String?
+
+  pairsAsKnown   LanguagePair[] @relation("KnownLanguage")
+  pairsAsTarget  LanguagePair[] @relation("TargetLanguage")
+
+  @@map("languages")
+}
+
+model LanguagePair {
+  id               String   @id @default(uuid())
+  knownLanguageId  String
+  targetLanguageId String
+
+  knownLanguage    Language @relation("KnownLanguage", fields: [knownLanguageId], references: [id])
+  targetLanguage   Language @relation("TargetLanguage", fields: [targetLanguageId], references: [id])
+
+  userLanguages    UserLanguage[]
+  courses          Course[]
+
+  @@unique([knownLanguageId, targetLanguageId])
+  @@map("language_pairs")
+}
+
+model UserLanguage {
+  id             String   @id @default(uuid())
+  userId         String
+  languagePairId String
+  currentLevel   String   @default("beginner")
+  enrolledAt     DateTime @default(now())
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  languagePair   LanguagePair @relation(fields: [languagePairId], references: [id])
+
+  @@unique([userId, languagePairId])
+  @@map("user_languages")
+}
+
+model Course {
+  id             String   @id @default(uuid())
+  languagePairId String
+  title          String
+  level          String
+  order          Int
+
+  languagePair   LanguagePair @relation(fields: [languagePairId], references: [id])
+  modules        Module[]
+
+  @@map("courses")
+}
+
+model Module {
+  id       String @id @default(uuid())
+  courseId String
+  title    String
+  order    Int
+
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons  Lesson[]
+
+  @@map("modules")
+}
+
+model Lesson {
+  id               String @id @default(uuid())
+  moduleId         String
+  title            String
+  content          String
+  order            Int
+  estimatedMinutes Int    @default(10)
+
+  module           Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  vocabulary       Vocabulary[]
+  quizzes          Quiz[]
+  progress         LessonProgress[]
+
+  @@map("lessons")
+}
+
+model Vocabulary {
+  id            String  @id @default(uuid())
+  lessonId      String
+  word          String
+  translation   String
+  pronunciation String?
+  audioUrl      String?
+
+  lesson        Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("vocabulary")
+}
+
+model Quiz {
+  id            String   @id @default(uuid())
+  lessonId      String
+  title         String
+  passThreshold Int      @default(70)
+
+  lesson        Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  questions     Question[]
+  attempts      QuizAttempt[]
+
+  @@map("quizzes")
+}
+
+model Question {
+  id       String       @id @default(uuid())
+  quizId   String
+  type     QuestionType
+  prompt   String
+  order    Int
+
+  quiz     Quiz           @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  answers  AnswerOption[]
+
+  @@map("questions")
+}
+
+model AnswerOption {
+  id         String  @id @default(uuid())
+  questionId String
+  text       String
+  isCorrect  Boolean @default(false)
+
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("answer_options")
+}
+
+model QuizAttempt {
+  id          String   @id @default(uuid())
+  userId      String
+  quizId      String
+  score       Int
+  passed      Boolean
+  attemptedAt DateTime @default(now())
+
+  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz        Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@map("quiz_attempts")
+}
+
+model LessonProgress {
+  id          String       @id @default(uuid())
+  userId      String
+  lessonId    String
+  status      LessonStatus @default(NOT_STARTED)
+  completedAt DateTime?
+
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@map("lesson_progress")
+}
+
+model Streak {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  currentStreak  Int      @default(0)
+  longestStreak  Int      @default(0)
+  lastActiveDate DateTime?
+
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("streaks")
+}
+
+model Plan {
+  id             String   @id @default(uuid())
+  name           String
+  price          Decimal
+  durationMonths Int
+  features       String[]
+
+  subscriptions  Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                 String             @id @default(uuid())
+  userId             String
+  planId             String
+  status             SubscriptionStatus @default(PENDING)
+  provider           String
+  providerReference  String?
+  startsAt           DateTime?
+  endsAt             DateTime?
+  createdAt          DateTime           @default(now())
+
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                Plan      @relation(fields: [planId], references: [id])
+  transactions        PaymentTransaction[]
+
+  @@map("subscriptions")
+}
+
+model PaymentTransaction {
+  id             String   @id @default(uuid())
+  subscriptionId String
+  amount         Decimal
+  status         String
+  rawPayload     Json?
+  createdAt      DateTime @default(now())
+
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@map("payment_transactions")
+}

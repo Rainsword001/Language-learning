@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "preserve",
+    "rootDir": "./",
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "bundler",
+    "types": [
+      "node"
+    ]
+  },
+  "include": ["src/**/*.ts", "server.ts"],
+  "exclude": ["node_modules", "dist"]
+}
