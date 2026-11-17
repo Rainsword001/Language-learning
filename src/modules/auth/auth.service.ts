@@ -2,6 +2,7 @@ import argon2 from 'argon2';
 import crypto from 'crypto';
 import { prisma } from '../../config/prisma';
 import { AppError } from '../../utils/AppError';
+import { sendPasswordResetEmail } from '../../utils/email';
 import {
   signAccessToken,
   signRefreshToken,
@@ -81,18 +82,43 @@ async function issueTokens(userId: string, role: 'USER' | 'ADMIN') {
 
 export async function requestPasswordReset(email: string) {
   const user = await prisma.user.findUnique({ where: { email } });
-  // Always respond the same way whether or not the user exists,
-  // to avoid leaking which emails are registered.
-  if (!user) return;
+  if (!user) return; // don't leak whether the email exists
 
   const resetToken = crypto.randomBytes(32).toString('hex');
-  const resetTokenHash = crypto
-    .createHash('sha256')
-    .update(resetToken)
-    .digest('hex');
+  const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+  const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-  // TODO: store resetTokenHash + expiry on the user (add fields to schema),
-  // then email `resetToken` (not the hash) to the user via your email provider.
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { resetTokenHash, resetTokenExpiry },
+  });
 
-  return resetToken;
+  await sendPasswordResetEmail(email, resetToken);
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  const resetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+  const user = await prisma.user.findFirst({
+    where: {
+      resetTokenHash,
+      resetTokenExpiry: { gte: new Date() },
+    },
+  });
+
+  if (!user) {
+    throw new AppError('Invalid or expired reset token', 400);
+  }
+
+  const passwordHash = await argon2.hash(newPassword);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash,
+      resetTokenHash: null,
+      resetTokenExpiry: null,
+      refreshTokenHash: null, // force re-login on all devices after reset
+    },
+  });
 }

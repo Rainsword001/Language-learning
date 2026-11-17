@@ -1,4 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
+import { resetPasswordSchema } from './auth.validators';
+import { resetPassword as resetPasswordService } from './auth.service';
 import {
   registerSchema,
   loginSchema,
@@ -63,6 +65,17 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
 
     res.clearCookie('refreshToken');
     res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { token, newPassword } = resetPasswordSchema.parse(req.body);
+    await resetPasswordService(token, newPassword);
+    res.json({ message: 'Password has been reset successfully.' });
   } catch (err) {
     next(err);
   }

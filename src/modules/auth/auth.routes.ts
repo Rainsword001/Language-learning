@@ -6,6 +6,7 @@ import {
   refresh,
   logout,
   forgotPassword,
+  resetPassword
 } from './auth.controller';
 import { authenticate } from '../../middleware/authenticate';
 
@@ -17,5 +18,6 @@ router.post('/login', authLimiter, login);
 router.post('/refresh', refresh);
 router.post('/logout', authenticate, logout);
 router.post('/forgot-password', authLimiter, forgotPassword);
+router.post('/reset-password', authLimiter, resetPassword);
 
 export default router;
