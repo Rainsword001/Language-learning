@@ -6,6 +6,7 @@ import {
   loginSchema,
   forgotPasswordSchema,
 } from './auth.validators';
+import { refreshCookieOptions, REFRESH_COOKIE_MAX_AGE } from '../../utils/cookies';
 import {
   registerUser,
   loginUser,
@@ -26,7 +27,10 @@ export async function register(req: Request, res: Response, next: NextFunction) 
     const { name, email, password } = registerSchema.parse(req.body);
     const { accessToken, refreshToken } = await registerUser(name, email, password);
 
-    res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
+    res.cookie('refreshToken', refreshToken, {
+    ...refreshCookieOptions,
+    maxAge: REFRESH_COOKIE_MAX_AGE,
+    });
     res.status(201).json({ accessToken });
   } catch (err) {
     next(err);
@@ -38,7 +42,10 @@ export async function login(req: Request, res: Response, next: NextFunction) {
     const { email, password } = loginSchema.parse(req.body);
     const { accessToken, refreshToken } = await loginUser(email, password);
 
-    res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
+    res.cookie('refreshToken', refreshToken, {
+    ...refreshCookieOptions,
+    maxAge: REFRESH_COOKIE_MAX_AGE,
+});
     res.json({ accessToken });
   } catch (err) {
     next(err);
@@ -51,7 +58,10 @@ export async function refresh(req: Request, res: Response, next: NextFunction) {
     if (!token) return res.status(401).json({ error: 'No refresh token' });
 
     const { accessToken, refreshToken } = await refreshTokens(token);
-    res.cookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
+    res.cookie('refreshToken', refreshToken, {
+    ...refreshCookieOptions,
+    maxAge: REFRESH_COOKIE_MAX_AGE,
+});
     res.json({ accessToken });
   } catch (err) {
     next(err);
@@ -63,7 +73,7 @@ export async function logout(req: Request, res: Response, next: NextFunction) {
     const userId = (req as any).user?.userId;
     if (userId) await logoutUser(userId);
 
-    res.clearCookie('refreshToken');
+    res.clearCookie('refreshToken', refreshCookieOptions);
     res.status(204).send();
   } catch (err) {
     next(err);
