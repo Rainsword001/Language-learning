@@ -1,8 +1,13 @@
-export async function sendPasswordResetEmail(email: string, resetToken: string) {
-  const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+import { Resend } from 'resend';
+import { env } from '../config/env';
 
-  if (process.env.NODE_ENV !== 'production') {
-    // Dev mode: no real email provider configured yet — just log it
+const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
+
+export async function sendPasswordResetEmail(email: string, resetToken: string) {
+  const resetUrl = `${env.CLIENT_URL}/reset-password?token=${resetToken}`;
+
+  // No API key (local development): log the link instead of sending
+  if (!resend) {
     console.log('--- PASSWORD RESET EMAIL (dev mode) ---');
     console.log(`To: ${email}`);
     console.log(`Reset link: ${resetUrl}`);
@@ -10,14 +15,21 @@ export async function sendPasswordResetEmail(email: string, resetToken: string) 
     return;
   }
 
-  // TODO: wire up a real provider here when ready (Resend, SendGrid, SES, etc.)
-  // Example with Resend:
-  // await resend.emails.send({
-  //   from: env.EMAIL_FROM,
-  //   to: email,
-  //   subject: 'Reset your password',
-  //   html: `<p>Click <a href="${resetUrl}">here</a> to reset your password. This link expires in 1 hour.</p>`,
-  // });
+  const { error } = await resend.emails.send({
+    from: env.EMAIL_FROM,
+    to: email,
+    subject: 'Reset your password',
+    text:
+      `We received a request to reset your password.\n\n` +
+      `Open this link to choose a new one (valid for 1 hour):\n${resetUrl}\n\n` +
+      `If you didn't request this, you can ignore this email.`,
+    html:
+      `<p>We received a request to reset your password.</p>` +
+      `<p><a href="${resetUrl}">Reset your password</a></p>` +
+      `<p>This link is valid for 1 hour. If you didn't request it, you can ignore this email.</p>`,
+  });
 
-  throw new Error('Email provider not configured for production');
+  if (error) {
+    throw new Error(`Resend failed: ${error.message}`);
+  }
 }

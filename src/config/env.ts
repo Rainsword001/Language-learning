@@ -11,6 +11,11 @@ const envSchema = z.object({
   CLIENT_URL: z.string().url(),
   PAYSTACK_SECRET_KEY: z.string().min(1),
   PAYSTACK_PUBLIC_KEY: z.string().min(1),
-});
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default('Language App <onboarding@resend.dev>'),
+}).refine((e) => e.NODE_ENV !== 'production' || !!e.RESEND_API_KEY, {
+    message: 'RESEND_API_KEY is required in production',
+    path: ['RESEND_API_KEY'],
+  });
 
 export const env = envSchema.parse(process.env);
