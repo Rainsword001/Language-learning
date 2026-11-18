@@ -88,12 +88,16 @@ export async function requestPasswordReset(email: string) {
   const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
   const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-  await prisma.user.update({
+    await prisma.user.update({
     where: { id: user.id },
     data: { resetTokenHash, resetTokenExpiry },
   });
 
-  await sendPasswordResetEmail(email, resetToken);
+  try {
+    await sendPasswordResetEmail(email, resetToken);
+  } catch (err) {
+    console.error('Password reset email failed:', err);
+  }
 }
 
 export async function resetPassword(token: string, newPassword: string) {
