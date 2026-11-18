@@ -25,6 +25,7 @@ app.use(
 app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
+app.set('trust proxy', 1); // trust first proxy
 
 
 // Apply globally, after helmet/cors, before routes
